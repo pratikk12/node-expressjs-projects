@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const { json } = require('stream/consumers');
+const { error } = require('console');
 
 
 function writeNote(req, res) {
@@ -50,32 +51,42 @@ function getNote(req, res) {
 }
 
 function editNote(req, res) {
-    fs.readFile('notes.json', (err, data) => {
-        if (err) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ error: `Error Reading File : ${err.message}` }));
-        }
-        console.log("editNote : ", JSON.parse(data));
-        const parsedData = JSON.parse(data);
-        console.log("parsedData : ", parsedData);
+    let reqData = "";
+    req.on('data', (chunk) => {
+        reqData = reqData + chunk.toString();
+        console.log("reqData data : ", reqData);
+    });
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-            message: "File Read successfully", data: JSON.parse(data)
-        }));
-        let reqData = []
-        let reqChunck = "";
-        req.on("data", (chunk) => {
-            reqData.push(JSON.parse(chunk));
+    req.on('end', () => {
+        fs.readFile('notes.json', 'utf8', (err, data) => {
+            if (err) {
+                return res.end(JSON.stringify({ message: `Error Reading File : ${err.message}`, error: err.message }))
+            }
+            let parsedFileData = JSON.parse(data);
+            let parsedReqData = JSON.parse(reqData);
+
+            console.log("parsedFileData : ", parsedFileData);
+            console.log("parsedReqData : ", parsedReqData);
+
+            for (let i = 0; i < parsedFileData.length; i++) {
+                if (parsedFileData[i].id === parsedReqData.id) {
+                    parsedFileData.splice(i, 1);
+                    parsedFileData.push(parsedReqData)
+                    console.log("parsedFileData in if: ", parsedFileData);
+                    return;
+                } else {
+                    parsedFileData.push(parsedReqData);
+                }
+            }
+            console.log("parsedFileData out for: ", parsedFileData);
+            fs.writeFile('notes.json', JSON.stringify(parsedFileData, null, 2), (err) => {
+                if (err) console.error(err);
+            })
         });
-        req.on('end', () => {
-            console.log("reqData : ", reqData);
-
-        })
     });
 
     console.log(`${req.method} Called in editNote`);
-
+    console.log("My name is pratik");
 }
 
 let route = {
